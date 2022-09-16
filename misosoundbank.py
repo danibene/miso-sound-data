@@ -109,6 +109,7 @@ def process_audio(y, sr=44100, target_sr=44100, norm_level=0.0, fade_duration=0.
     if sr != target_sr:
         y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
         sr = target_sr
+    return apply_fade(normalize(y, level=norm_level), sr=sr, duration=fade_duration), sr
 
 
 def save_audio(out_path, y, sr):
