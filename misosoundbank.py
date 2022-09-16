@@ -71,7 +71,8 @@ def normalize(y, sr=44100, level=-18.0):
     # https://github.com/jiaaro/pydub/issues/90
     sound = librosa_to_pydub(y, sr)
     change_in_dBFS = level - sound.dBFS
-    return pydub_to_librosa(sound.apply_gain(change_in_dBFS))
+    y, sr = pydub_to_librosa(sound.apply_gain(change_in_dBFS))
+    return y
 
 
 def apply_fade(y, sr=44100, duration=0.010, inout="both"):
