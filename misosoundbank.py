@@ -43,7 +43,7 @@ def load_audio_from_url(in_path):
     return y, sr
 
 
-def normalize(y, level=0.0):
+def normalize(y, level=-18.0):
     """RMS-normalization"""
     if level is not None:
         return y * np.sqrt(
@@ -104,7 +104,7 @@ def segment_audio(y, sr=None, segment=None):
     return y, sr
 
 
-def process_audio(y, sr=44100, target_sr=44100, norm_level=0.0, fade_duration=0.010):
+def process_audio(y, sr=44100, target_sr=44100, norm_level=-18.0, fade_duration=0.010):
     """Resample, then apply fade-in, fade-out, and RMS normalization"""
     if sr != target_sr:
         y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
