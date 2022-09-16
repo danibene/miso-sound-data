@@ -6,7 +6,7 @@ setup(
     name="misosoundbank",
     version="0.1.0",
     description="API for an open-access sound bank intended for misophonia research",
-    long_description=",
+    long_description="API for an open-access sound bank intended for misophonia research",
     author="Danielle Benesch",
     author_email="dbenesch@critias.ca",
     py_modules=["misosoundbank"],
