@@ -43,14 +43,38 @@ def load_audio_from_url(in_path):
     return y, sr
 
 
-def normalize(y, level=-18.0):
-    """RMS-normalization"""
-    if level is not None:
-        return y * np.sqrt(
-            (len(y) * np.square(10 ** (level / 10))) / np.sum(np.square(y))
-        )
-    else:
-        return y
+def librosa_to_pydub(y, sr):
+  # https://stackoverflow.com/questions/58810035/converting-audio-files-between-pydub-and-librosa
+    # convert from float to uint16
+    if y.dtype == np.dtype("float32"):
+      y = np.array(y * (1<<15), dtype=np.int16)
+    audio_segment = pydub.AudioSegment(
+        y.tobytes(), 
+        frame_rate=sr,
+        sample_width=y.dtype.itemsize, 
+        channels=1
+    )
+    return audio_segment
+
+
+def pydub_to_librosa(audio_segment):
+  # https://stackoverflow.com/questions/58810035/converting-audio-files-between-pydub-and-librosa
+  channel_sounds = audio_segment.split_to_mono()
+  sr = audio_segment.frame_rate
+  samples = [s.get_array_of_samples() for s in channel_sounds]
+
+  fp_arr = np.array(samples).T.astype(np.float32)
+  fp_arr /= np.iinfo(samples[0].typecode).max
+  y = fp_arr.reshape(-1)
+  return y, sr
+
+  
+def normalize(y, sr=44100, level=-18.0):
+    """Normalize to target level specified in dBFS"""
+  # https://github.com/jiaaro/pydub/issues/90
+  sound = librosa_to_pydub(y, sr)
+  change_in_dBFS = level - sound.dBFS
+  return pydub_to_librosa(sound.apply_gain(change_in_dBFS))
 
 
 def apply_fade(y, sr=44100, duration=0.010, inout="both"):
@@ -109,7 +133,7 @@ def process_audio(y, sr=44100, target_sr=44100, norm_level=-18.0, fade_duration=
     if sr != target_sr:
         y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
         sr = target_sr
-    return apply_fade(normalize(y, level=norm_level), sr=sr, duration=fade_duration), sr
+    return apply_fade(normalize(y, sr=sr, level=norm_level), sr=sr, duration=fade_duration), sr
 
 
 def save_audio(out_path, y, sr):
