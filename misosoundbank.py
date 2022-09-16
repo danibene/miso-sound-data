@@ -116,8 +116,7 @@ def save_audio(out_path, y, sr):
     # if output parent path does not exist, create it
     pathlib.Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     sf.write(out_path, y, sr)
-    return apply_fade(normalize(y, level=norm_level), sr=sr, duration=fade_duration), sr
-
+    
 
 class MisoSoundLoader:
     def __init__(
