@@ -1,2 +1,2 @@
 # miso-sound-data
-API for accessing sound bank
+API for downloading and preprocessing the sounds in the Free Open-Access Misophonia Stimuli (FOAMS) database.
