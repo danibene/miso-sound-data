@@ -13,6 +13,7 @@ from urllib.request import urlopen
 
 
 def is_url(x):
+    """Check if a string is a URL"""
     # https://stackoverflow.com/questions/7160737/how-to-validate-a-url-in-python-malformed-or-not
     try:
         result = urlparse(x)
