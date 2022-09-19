@@ -1,6 +1,7 @@
 import os
 import io
 import pydub
+import ffmpeg_normalize
 import pandas as pd
 import requests
 import wget
@@ -30,18 +31,20 @@ def download_from_url(in_path, out_dir_path):
     return wget.download(in_path, out=out_dir_path)
 
 
-def load_audio_from_url(in_path):
-    """Load audio from URL without writing file"""
-    aud = io.BytesIO()
-    # https://stackoverflow.com/questions/59426275/download-and-open-file-with-librosa-without-writing-to-filesystem
-    with urlopen(in_path) as r:
-        r.seek = lambda *args: None  # allow pydub to call seek(0)
-        pydub.AudioSegment.from_file(r).export(
-            aud, pathlib.Path(in_path).suffix.split(".")[1]
-        )
-    aud.seek(0)
-    y, sr = librosa.load(aud, mono=True, sr=None)
-    return y, sr
+def load_audio(in_path):
+    """Load audio without writing file"""
+    if is_url(in_path):
+        p = io.BytesIO()
+        # https://stackoverflow.com/questions/59426275/download-and-open-file-with-librosa-without-writing-to-filesystem
+        with urlopen(in_path) as r:
+            r.seek = lambda *args: None  # allow pydub to call seek(0)
+            pydub.AudioSegment.from_file(r).export(
+                p, pathlib.Path(in_path).suffix.split(".")[1]
+            )
+        p.seek(0)
+    else:
+        p = in_path
+    return librosa.load(p, mono=True, sr=None)
 
 
 def librosa_to_pydub(y, sr):
@@ -67,13 +70,34 @@ def pydub_to_librosa(audio_segment):
     return y, sr
 
 
-def normalize(y, sr=44100, level=-18.0):
-    """Normalize to target level specified in dBFS"""
+def match_target_amplitude_pydub(y, sr=44100, level=-18.0):
+    # Normalize with target level specified in dBFS
     # https://github.com/jiaaro/pydub/issues/90
     sound = librosa_to_pydub(y, sr)
     change_in_dBFS = level - sound.dBFS
     y, sr = pydub_to_librosa(sound.apply_gain(change_in_dBFS))
     return y
+
+
+def normalize(y, sr=44100, level=-23.0, method="ffmpeg_normalize", **kwargs):
+    if level is not None and method is not None:
+        if method == "ffmpeg_normalize":
+            tmp_pre_path = str(pathlib.Path("tmp", "tmp_pre.wav"))
+            tmp_post_path = str(pathlib.Path("tmp", "tmp_post.wav"))
+            normalizer = ffmpeg_normalize.FFmpegNormalize(
+                sample_rate=sr, target_level=level, **kwargs
+            )
+            save_audio(out_path=tmp_pre_path, y=y, sr=sr)
+            normalizer.add_media_file(tmp_pre_path, tmp_post_path)
+            normalizer.run_normalization()
+            y, sr = load_audio(in_path=tmp_post_path)
+            os.remove(tmp_pre_path)
+            os.remove(tmp_post_path)
+            return y
+        else:
+            return match_target_amplitude_pydub(y, sr=sr, **kwargs)
+    else:
+        return y
 
 
 def apply_fade(y, sr=44100, duration=0.010, inout="both"):
@@ -127,11 +151,14 @@ def segment_audio(y, sr=None, segment=None):
     return y, sr
 
 
-def process_audio(y, sr=44100, target_sr=44100, norm_level=-18.0, fade_duration=0.010):
-    """Resample, then apply fade-in, fade-out, and RMS normalization"""
+def process_audio(
+    y, sr=44100, target_sr=44100, norm_level=None, fade_duration=0.010, **kwargs
+):
+    """Resample, then apply fade-in and fade-out. norm_level can be set to apply normalization."""
     if sr != target_sr:
         y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
         sr = target_sr
+
     return (
         apply_fade(
             normalize(y, sr=sr, level=norm_level), sr=sr, duration=fade_duration
@@ -238,6 +265,7 @@ class MisoSoundLoader:
         return_audio=True,
         segment_processed=True,
         process_func=process_audio,
+        **kwargs
     ):
         """Load, segment and process audio"""
         audio_paths = self.get_paths()["audio"]
@@ -250,15 +278,13 @@ class MisoSoundLoader:
                 )
                 sr = None
             else:
-                y, sr = load_audio_from_url(
-                    in_path=paths["original_audio_in_file_path"]
-                )
+                y, sr = load_audio(in_path=paths["original_audio_in_file_path"])
             if segment_processed:
                 y, sr = segment_audio(y=y, sr=sr, segment=paths["segment_in_file_path"])
             else:
                 y, sr = segment_audio(y=y, sr=sr, segment=None)
             if process_func is not None:
-                y, sr = process_func(y, sr=sr)
+                y, sr = process_func(y, sr=sr, **kwargs)
             if save_processed:
                 save_audio(paths["processed_audio_out_file_path"], y, sr)
             if return_audio:
