@@ -1,14 +1,14 @@
 import os
 import io
 import pydub
-import ffmpeg_normalize
-import pandas as pd
 import requests
 import wget
 import pathlib
-import numpy as np
 import librosa
+import numpy as np
+import pandas as pd
 import soundfile as sf
+from warnings import warn
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -82,6 +82,12 @@ def match_target_amplitude_pydub(y, sr=44100, level=-18.0):
 def normalize(y, sr=44100, level=-23.0, method="ffmpeg_normalize", **kwargs):
     if level is not None and method is not None:
         if method == "ffmpeg_normalize":
+            try:
+                import ffmpeg_normalize
+            except:
+                warn(
+                    "Error importing ffmpeg_normalize. To install, run `pip install ffmpeg_normalize`"
+                )
             tmp_pre_path = str(pathlib.Path("tmp", "tmp_pre.wav"))
             tmp_post_path = str(pathlib.Path("tmp", "tmp_post.wav"))
             normalizer = ffmpeg_normalize.FFmpegNormalize(
