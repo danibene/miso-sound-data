@@ -159,7 +159,7 @@ def segment_audio(y, sr=None, segment=None):
         y, sr = librosa.load(y, mono=True, sr=sr, offset=offset, duration=duration)
     else:
         if duration is None:
-            y = y[np.rint(sr * offset) :]
+            y = y[int(np.rint(sr * offset)) :]
         else:
             y = y[int(np.rint(sr * offset)) : int(np.rint(sr * (duration - offset)))]
 
