@@ -23,6 +23,15 @@ def is_url(x):
         return False
 
 
+def is_available(x):
+    """Check if a file is available given URL or path"""
+    if is_url(x):
+        r = requests.head(x)
+        return r.status_code == 200
+    else:
+        return pathlib.Path(x).is_file()
+
+
 def download_from_url(in_path, out_dir_path):
     """Download a file from a URL to a specified directory"""
     if is_url(in_path):
@@ -287,14 +296,21 @@ class MisoSoundLoader:
                 sr = None
             else:
                 y, sr = load_audio(in_path=paths["original_audio_in_file_path"])
+            processed_available = True
             if segment_processed:
-                y, sr = segment_audio(y=y, sr=sr, segment=paths["segment_in_file_path"])
+                if is_available(paths["segment_in_file_path"]):
+                    y, sr = segment_audio(
+                        y=y, sr=sr, segment=paths["segment_in_file_path"]
+                    )
+                else:
+                    processed_available = False
             else:
                 y, sr = segment_audio(y=y, sr=sr, segment=None)
-            if process_func is not None:
-                y, sr = process_func(y, sr=sr, **kwargs)
-            if save_processed:
-                save_audio(paths["processed_audio_out_file_path"], y, sr)
+            if processed_available:
+                if process_func is not None:
+                    y, sr = process_func(y, sr=sr, **kwargs)
+                if save_processed:
+                    save_audio(paths["processed_audio_out_file_path"], y, sr)
             if return_audio:
                 audio.append({"sig": y, "sampling_rate": sr, "id": id})
         if return_audio:
