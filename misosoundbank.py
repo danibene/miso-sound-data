@@ -186,16 +186,17 @@ class MisoSoundLoader:
         root_out_path=str(pathlib.Path("miso_sound_download")),
         segment_in_dir_path="https://raw.githubusercontent.com/miso-sound/miso-sound-annotate/main/segmentation",
         label_in_dir_path="https://raw.githubusercontent.com/miso-sound/miso-sound-annotate/main/labels",
+        original_audio_in_dir_path="https://zenodo.org/api/records/7106450",
     ):
         """Loader for sound bank"""
         self.root_out_path = root_out_path
         self.ids = ids
         self.segment_in_dir_path = segment_in_dir_path
         self.label_in_dir_path = label_in_dir_path
+        self.original_audio_in_dir_path = original_audio_in_dir_path
 
     def get_paths(
         self,
-        original_audio_in_dir_path="https://zenodo.org/api/records/7018063",
         original_audio_name_end="_original",
         processed_audio_name_end="_processed",
         original_audio_out_dir_name="original_audio",
@@ -207,6 +208,7 @@ class MisoSoundLoader:
         segment_in_dir_path = self.segment_in_dir_path
         label_in_dir_path = self.label_in_dir_path
         label_out_dir_path = str(pathlib.Path(root_out_path, "labels"))
+        original_audio_in_dir_path = self.original_audio_in_dir_path
         original_audio_out_dir_path = str(
             pathlib.Path(root_out_path, original_audio_out_dir_name)
         )
