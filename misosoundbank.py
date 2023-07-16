@@ -8,9 +8,12 @@ import librosa
 import numpy as np
 import pandas as pd
 import soundfile as sf
+import shutil
+from typing import Callable
 from warnings import warn
 from urllib.parse import urlparse
 from urllib.request import urlopen
+import zipfile
 
 
 def is_url(x):
@@ -181,6 +184,101 @@ def process_audio(
         sr,
     )
 
+def extract_zip(input_path: str, output_dir: str) -> None:
+    """
+    Extracts the contents of a ZIP archive to the specified directory.
+
+    Args:
+        input_path (str): Path to the input ZIP archive.
+        output_dir (str): Path to the output directory for extracting the ZIP archive.
+
+    Returns:
+        None
+    """
+    with zipfile.ZipFile(input_path, 'r') as zip_ref:
+        zip_ref.extractall(output_dir)
+
+
+def convert_wav_to_flac(wav_path: str, flac_path: str) -> None:
+    """
+    Converts a WAV file to FLAC format.
+
+    Args:
+        wav_path (str): Path to the input WAV file.
+        flac_path (str): Path to save the output FLAC file.
+
+    Returns:
+        None
+    """
+    wav_data, sr = librosa.load(wav_path, sr=None)
+    sf.write(flac_path, wav_data, sr, format='flac')
+
+
+def convert_files_in_directory(input_dir: str, output_dir: str, file_format: str, conversion_func: Callable) -> None:
+    """
+    Converts files with the specified format in a directory using the given conversion function.
+
+    Args:
+        input_dir (str): Path to the input directory.
+        output_dir (str): Path to the output directory for saving the converted files.
+        file_format (str): File format of the files to be converted.
+        conversion_func (callable): Function for converting the files to the desired format.
+
+    Returns:
+        None
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    for root, dirs, files in os.walk(input_dir):
+        for file in files:
+            if file.endswith(file_format):
+                input_path = os.path.join(root, file)
+                output_path = os.path.join(output_dir, file)
+                conversion_func(input_path, output_path)
+
+
+def create_zip(input_dir: str, output_path: str) -> None:
+    """
+    Creates a ZIP archive from the contents of a directory.
+
+    Args:
+        input_dir (str): Path to the input directory.
+        output_path (str): Path to the output ZIP archive.
+
+    Returns:
+        None
+    """
+    with zipfile.ZipFile(output_path, 'w') as zip_output:
+        for root, dirs, files in os.walk(input_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                zip_output.write(file_path, os.path.relpath(file_path, input_dir))
+
+
+def convert_wav_zip_to_flac_zip(input_zip: str, output_zip: str) -> None:
+    """
+    Converts WAV files in a ZIP archive to FLAC format and saves them in a new ZIP archive.
+
+    Args:
+        input_zip (str): Path to the input ZIP archive containing WAV files.
+        output_zip (str): Path to the output ZIP archive for saving the converted FLAC files.
+
+    Returns:
+        None
+    """
+    temp_dir = "temp_conversion"
+
+    # Extract the input ZIP file
+    extract_zip(input_zip, temp_dir)
+
+    # Convert WAV files to FLAC
+    convert_files_in_directory(temp_dir, temp_dir, ".wav", convert_wav_to_flac)
+
+    # Create a new ZIP file with the converted FLAC files
+    create_zip(temp_dir, output_zip)
+
+    # Remove the temporary directory
+    shutil.rmtree(temp_dir)
 
 def save_audio(out_path, y, sr):
     # if output parent path does not exist, create it
