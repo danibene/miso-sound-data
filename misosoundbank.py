@@ -3,7 +3,7 @@ import io
 import pydub
 import requests
 import wget
-import pathlib
+from pathlib import Path
 import librosa
 import numpy as np
 import pandas as pd
@@ -32,14 +32,14 @@ def is_available(x):
         r = requests.head(x)
         return r.status_code == 200
     else:
-        return pathlib.Path(x).is_file()
+        return Path(x).is_file()
 
 
 def download_from_url(in_path, out_dir_path):
     """Download a file from a URL to a specified directory"""
     if is_url(in_path):
         # if output path does not exist, create it
-        pathlib.Path(out_dir_path).mkdir(parents=True, exist_ok=True)
+        Path(out_dir_path).mkdir(parents=True, exist_ok=True)
     return wget.download(in_path, out=out_dir_path)
 
 
@@ -51,7 +51,7 @@ def load_audio(in_path):
         with urlopen(in_path) as r:
             r.seek = lambda *args: None  # allow pydub to call seek(0)
             pydub.AudioSegment.from_file(r).export(
-                p, pathlib.Path(in_path).suffix.split(".")[1]
+                p, Path(in_path).suffix.split(".")[1]
             )
         p.seek(0)
     else:
@@ -100,8 +100,8 @@ def normalize(y, sr=44100, level=-23.0, method="ffmpeg_normalize", **kwargs):
                 warn(
                     "Error importing ffmpeg_normalize. To install, run `pip install ffmpeg_normalize`"
                 )
-            tmp_pre_path = str(pathlib.Path("tmp", "tmp_pre.wav"))
-            tmp_post_path = str(pathlib.Path("tmp", "tmp_post.wav"))
+            tmp_pre_path = str(Path("tmp", "tmp_pre.wav"))
+            tmp_post_path = str(Path("tmp", "tmp_post.wav"))
             normalizer = ffmpeg_normalize.FFmpegNormalize(
                 sample_rate=sr, target_level=level, **kwargs
             )
@@ -214,7 +214,7 @@ def convert_wav_to_flac(wav_path: str, flac_path: str) -> None:
     sf.write(flac_path, wav_data, sr, format='flac')
 
 
-def convert_files_in_directory(input_dir: str, output_dir: str, file_format: str, conversion_func: Callable) -> None:
+def convert_files_in_directory(input_dir: str, output_dir: str, file_format: str, conversion_func: Callable) -> List[str]:
     """
     Converts files with the specified format in a directory using the given conversion function.
 
@@ -225,16 +225,20 @@ def convert_files_in_directory(input_dir: str, output_dir: str, file_format: str
         conversion_func (callable): Function for converting the files to the desired format.
 
     Returns:
-        None
+        List[str]: List of converted file paths.
     """
-    os.makedirs(output_dir, exist_ok=True)
+    input_dir_path = Path(input_dir)
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    converted_files = []
 
-    for root, dirs, files in os.walk(input_dir):
-        for file in files:
-            if file.endswith(file_format):
-                input_path = os.path.join(root, file)
-                output_path = os.path.join(output_dir, file)
-                conversion_func(input_path, output_path)
+    for file_path in input_dir_path.glob(f'**/*{file_format}'):
+        rel_path = file_path.relative_to(input_dir_path)
+        output_path = output_dir_path / rel_path.with_suffix('.flac')
+        conversion_func(str(file_path), str(output_path))
+        converted_files.append(str(output_path))
+
+    return converted_files
 
 
 def create_zip(input_dir: str, output_path: str) -> None:
@@ -248,11 +252,13 @@ def create_zip(input_dir: str, output_path: str) -> None:
     Returns:
         None
     """
+    input_dir_path = Path(input_dir)
+
     with zipfile.ZipFile(output_path, 'w') as zip_output:
-        for root, dirs, files in os.walk(input_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                zip_output.write(file_path, os.path.relpath(file_path, input_dir))
+        for file_path in input_dir_path.glob('**/*'):
+            if file_path.is_file():
+                rel_path = file_path.relative_to(input_dir_path)
+                zip_output.write(file_path, arcname=str(rel_path))
 
 
 def convert_wav_zip_to_flac_zip(input_zip: str, output_zip: str) -> None:
@@ -272,7 +278,7 @@ def convert_wav_zip_to_flac_zip(input_zip: str, output_zip: str) -> None:
     extract_zip(input_zip, temp_dir)
 
     # Convert WAV files to FLAC
-    convert_files_in_directory(temp_dir, temp_dir, ".wav", convert_wav_to_flac)
+    converted_files = convert_files_in_directory(temp_dir, temp_dir, ".wav", convert_wav_to_flac)
 
     # Create a new ZIP file with the converted FLAC files
     create_zip(temp_dir, output_zip)
@@ -282,7 +288,7 @@ def convert_wav_zip_to_flac_zip(input_zip: str, output_zip: str) -> None:
 
 def save_audio(out_path, y, sr):
     # if output parent path does not exist, create it
-    pathlib.Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     sf.write(out_path, y, sr)
 
 
@@ -290,7 +296,7 @@ class MisoSoundLoader:
     def __init__(
         self,
         ids=None,
-        root_out_path=str(pathlib.Path("miso_sound_download")),
+        root_out_path=str(Path("miso_sound_download")),
         segment_in_dir_path="https://raw.githubusercontent.com/miso-sound/miso-sound-annotate/main/segmentation",
         label_in_dir_path="https://raw.githubusercontent.com/miso-sound/miso-sound-annotate/main/labels",
         original_audio_in_dir_path="https://zenodo.org/api/records/7106450",
@@ -314,13 +320,13 @@ class MisoSoundLoader:
         root_out_path = self.root_out_path
         segment_in_dir_path = self.segment_in_dir_path
         label_in_dir_path = self.label_in_dir_path
-        label_out_dir_path = str(pathlib.Path(root_out_path, "labels"))
+        label_out_dir_path = str(Path(root_out_path, "labels"))
         original_audio_in_dir_path = self.original_audio_in_dir_path
         original_audio_out_dir_path = str(
-            pathlib.Path(root_out_path, original_audio_out_dir_name)
+            Path(root_out_path, original_audio_out_dir_name)
         )
         processed_audio_out_dir_path = str(
-            pathlib.Path(root_out_path, processed_audio_out_dir_name)
+            Path(root_out_path, processed_audio_out_dir_name)
         )
         all_paths = {}
         audio_paths = {}
@@ -349,7 +355,7 @@ class MisoSoundLoader:
                 + str(id)
                 + "_segment.txt",
                 "processed_audio_out_file_path": str(
-                    pathlib.Path(
+                    Path(
                         processed_audio_out_dir_path,
                         str(id) + processed_audio_name_end + ".wav",
                     )
