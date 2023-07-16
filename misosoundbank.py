@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import shutil
-from typing import Callable
+from typing import Callable, List
 from warnings import warn
 from urllib.parse import urlparse
 from urllib.request import urlopen
